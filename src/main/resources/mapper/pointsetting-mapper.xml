@@ -1,0 +1,129 @@
+<?xml version="1.0"  encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sinosafe.dao.mapper.PointSettingMapper">
+    <resultMap id="pointSettingMap" type="com.sinosafe.entity.PointSetting">
+        <result property="id" jdbcType="INTEGER" javaType="int" column="id" />
+        <result property="ruleId" jdbcType="INTEGER" javaType="int" column="rule_id" />
+        <result property="ruleName" jdbcType="VARCHAR" javaType="String" column="rule_name" />
+        <result property="pointType" jdbcType="VARCHAR" javaType="String" column="point_type" />
+        <result property="pointSource" jdbcType="VARCHAR" javaType="String" column="point_source" />
+        <result property="points" jdbcType="INTEGER" javaType="int" column="points" />
+        <result property="limitPoints" jdbcType="INTEGER" javaType="int" column="limit_points" />
+        <result property="mechanism" jdbcType="VARCHAR" javaType="String" column="mechanism" />
+        <result property="ratio" jdbcType="DOUBLE" javaType="Double" column="ratio" />
+        <result property="mappingType" jdbcType="VARCHAR" javaType="String" column="mapping_type" />
+        <result property="status" jdbcType="INTEGER" javaType="int" column="status" />
+        <result property="productCode" jdbcType="VARCHAR" javaType="String" column="product_code" />
+        <result property="createdBy" jdbcType="VARCHAR" javaType="String" column="created_by" />
+        <result property="updatedBy" jdbcType="VARCHAR" javaType="String" column="updated_by" />
+    </resultMap>
+
+    <select id="findLastRuleId" resultType="java.lang.Integer">
+        SELECT NVL(MAX(rule_id),0) AS rule_id FROM (SELECT rule_id FROM points_setting ORDER BY rule_id DESC) WHERE rownum = 1
+    </select>
+
+    <insert id="savePointsSetting" useGeneratedKeys="true" parameterType="java.util.List">
+        <selectKey resultType="int" keyProperty="id" order="AFTER">
+            SELECT pk_seq.nextval from dual
+        </selectKey>
+        INSERT INTO points_setting(id,rule_id,rule_name,point_type,product_code,point_source,points,limit_points,mechanism,ratio,mapping_type,status,created_by,updated_by)
+        SELECT pk_seq.NEXTVAL, A.* FROM (
+        <foreach collection="list" item="item" index="index"  separator="union all"  >
+            SELECT #{item.ruleId},#{item.ruleName},#{item.pointType},upper(#{item.productCode,jdbcType=VARCHAR}),#{item.pointSource},#{item.points,jdbcType=INTEGER},#{item.limitPoints,jdbcType=INTEGER},#{item.mechanism,jdbcType=VARCHAR},#{item.ratio,jdbcType=NUMERIC},#{item.mappingType,jdbcType=VARCHAR},#{item.status,jdbcType=INTEGER},#{item.createdBy,jdbcType=VARCHAR},#{item.updatedBy,jdbcType=VARCHAR}
+            from dual
+        </foreach>
+        ) A
+    </insert>
+
+    <select id="findIsPointsSetting" parameterType="com.sinosafe.entity.PointSetting" resultType="Integer">
+        SELECT NVL(MAX(rule_id),-1) as rule_id
+        FROM points_setting
+        WHERE
+        point_source = #{pointSource,jdbcType=VARCHAR}
+        <if test="'ORDER' == pointType">
+            AND product_code = #{productCode,jdbcType=VARCHAR}
+            AND mechanism = #{mechanism,jdbcType=VARCHAR}
+        </if>
+        AND point_type = #{pointType,jdbcType=VARCHAR}
+        AND status = #{status,jdbcType=INTEGER}
+    </select>
+
+    <update id="updatePointsSettingStatus">
+        UPDATE POINTS_SETTING SET status = #{status} , UPDATED_BY = #{updatedBy} , UPDATED_DATE = sysdate WHERE rule_id = #{ruleId}
+    </update>
+
+    <select id="findPointSettingByRuleId" resultType="com.sinosafe.entity.PointSetting" parameterType="java.lang.Integer">
+        select
+        t.rule_id as ruleId ,
+        t.rule_name as ruleName ,
+        t.point_type as pointType ,
+        t.points as points ,
+        t.limit_points as limitPoints ,
+        t.mechanism as mechanism ,
+        t.product_code as productCode ,
+        c.dict_value as pointSource ,
+        t.ratio as ratio ,
+        t.mapping_type as mappingType ,
+        t.status as status
+        from points_setting t, mechanism m ,data_dict c
+        where m.mechanism = t.mechanism and c.dict_code = t.point_source and c.status = 1 and m.status = 1
+        and t.rule_id = #{ruleId ,jdbcType=INTEGER}
+    </select>
+
+    <select id="findPointByUserId" resultType="java.lang.Long">
+        select p.total_points from USER_POINTS p where p.user_id =  #{userId} and p.status = '1'
+    </select>
+
+    <select id="findRuleByChooses" resultType="com.sinosafe.entity.PointSetting" parameterType="com.sinosafe.entity.PointSetting">
+      with dt as(
+         select * from data_dict where status=1
+        )
+        select
+        a.rule_id as ruleId ,
+        a.rule_name as ruleName ,
+        (select e.dict_value from dt e where e.dict_code = a.point_type and e.dict_group='POINTS_TYPE' and rownum=1) as pointType ,
+        a.points as points ,
+        a.limit_points as limitPoints ,
+        to_char(wm_concat(distinct(m.mechanism_name))) as mechanism ,
+        to_char(wm_concat(distinct(a.product_code))) as productCode ,
+        to_char(wm_concat(distinct(select ps.dict_value from dt ps where ps.dict_code=a.point_source and  ps.dict_group='SYSTEM_TYPE' and rownum=1))) as pointSource ,
+        a.ratio as ratio ,
+        (select  m.dict_value from dt m where m.dict_code = a.mapping_type and m.dict_group='MAPPING_TYPE'  and rownum=1) as mappingType ,
+        a.status as status
+        from  points_setting a
+        left join mechanism m on a.mechanism =m.mechanism
+        where a.status != 0
+        /*<if test="id > 0">
+            and a.id = #{id ,jdbcType=INTEGER}
+        </if>*/
+        <if test="ruleName != null and ruleName != ''">
+            and a.rule_name = #{ruleName,jdbcType=VARCHAR}
+        </if>
+        <if test="pointSource != null and pointSource != ''">
+            and a.point_source = #{pointSource,jdbcType=VARCHAR}
+        </if>
+        <if test="mechanism != null and mechanism != ''">
+            and a.mechanism = #{mechanism,jdbcType=VARCHAR}
+        </if>
+        <if test="productCode != null and productCode != ''">
+            and a.product_code = #{productCode,jdbcType=VARCHAR}
+        </if>
+        <if test="ruleId > 0">
+            and a.rule_id = #{ruleId ,jdbcType=INTEGER}
+        </if>
+        group by a.rule_id,a.rule_name,a.point_type,a.points,a.limit_points,a.ratio,a.mapping_type,a.status
+    </select>
+
+    <select id="findProductPointSetting" resultType="com.sinosafe.vo.PointsSettingVO" parameterType="java.util.List">
+        select a.points,a.product_code as productCode from (
+        <foreach collection="list" item="item" index="index" separator=" union  " >
+            SELECT DECODE(mapping_type,'RATIO',#{item.fee}*ratio,'FIX',points) as points , product_code
+            from points_setting
+            WHERE point_type=#{item.pointType} and point_source=#{item.pointSource} and status=#{item.status,jdbcType=INTEGER}
+            <if test="item.pointType == 'ORDER' " >
+                and product_code=#{item.productCode,jdbcType=VARCHAR} and mechanism=#{item.mechanism,jdbcType=VARCHAR}
+            </if>
+        </foreach>
+        ) a
+    </select>
+</mapper>

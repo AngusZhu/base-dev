@@ -1,0 +1,134 @@
+<?xml version="1.0"  encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sinosafe.dao.mapper.UserPointsMapper">
+
+    <resultMap id="pointSettingMap" type="com.sinosafe.entity.UserPoints">
+        <id property="id" jdbcType="INTEGER" javaType="Long" column="id" />
+        <result property="userId" jdbcType="VARCHAR" javaType="String" column="user_id" />
+        <result property="totalPoints" jdbcType="INTEGER" javaType="Double" column="total_points" />
+        <result property="sumPoints" jdbcType="INTEGER" javaType="Double" column="sum_points" />
+        <result property="status" jdbcType="INTEGER" javaType="int" column="status" />
+        <result property="masterId" jdbcType="INTEGER" javaType="Long" column="master_id" />
+
+        <result property="createdBy" jdbcType="VARCHAR" javaType="String" column="created_by" />
+        <result property="updatedBy" jdbcType="VARCHAR" javaType="String" column="updated_by" />
+
+        <result property="createdDate" jdbcType="TIMESTAMP" javaType="java.sql.Timestamp" column="created_date" />
+        <result property="updatedDate" jdbcType="TIMESTAMP" javaType="java.sql.Timestamp" column="updated_date" />
+    </resultMap>
+
+    <!--<insert id="savePointsSetting" useGeneratedKeys="true" parameterType="java.util.List">-->
+        <!--<selectKey resultType="long" keyProperty="id" order="AFTER">-->
+            <!--SELECT-->
+            <!--LAST_INSERT_ID()-->
+        <!--</selectKey>-->
+        <!--INSERT INTO points_setting(id,rule_id,rule_name,point_type,product_code,point_source,points,limit_points,mechanism,ratio,mapping_type,status)-->
+        <!--VALUES-->
+        <!--<foreach collection="array" item="item" index="index" separator="," >-->
+            <!--(PK_SEQ.NEXTVAL,#{item.ruleId},#{item.ruleName},#{item.pointType},#{item.productCode},#{item.pointSource},#{item.points},#{item.limitPoints},#{item.mechanism},#{item.ratio},#{item.mappingType},#{item.status});-->
+        <!--</foreach>-->
+    <!--</insert>-->
+    <select id="findUserPoints" parameterType="java.lang.String" resultType="com.sinosafe.entity.UserPoints">
+        <!--<if test="type!='ALL'">-->
+        <!--AND  p.POINT_TYPE = #{type}-->
+        <!--</if>-->
+        SELECT
+        id id,
+        USER_ID userId,
+        TOTAL_POINTS totalPoints,
+        SUM_POINTS sumPoints,
+        STATUS  status,
+        CREATED_DATE createdDate,
+        CREATED_BY createdBy,
+        UPDATED_DATE updatedDate,
+        UPDATED_BY updatedBy
+        FROM USER_POINTS WHERE USER_ID=#{userId} AND STATUS=1
+    </select>
+
+    <insert id="saveUserPoint"  parameterType="com.sinosafe.entity.UserPoints">
+        INSERT INTO user_points(id,user_id,total_points,sum_points,status,created_by,updated_by)
+        VALUES(#{id,jdbcType=INTEGER},#{userId,jdbcType=VARCHAR},#{totalPoints,jdbcType=INTEGER},
+            #{sumPoints,jdbcType=INTEGER},#{status,jdbcType=INTEGER},#{createdBy,jdbcType=VARCHAR},#{updatedBy,jdbcType=VARCHAR})
+    </insert>
+    <delete id="deleteUserPonitById" parameterType="java.lang.String">
+        DELETE FROM USER_POINTS WHERE  USER_ID=#{userId}
+    </delete>
+
+    <insert id="saveUserHistoryPoint"  parameterType="com.sinosafe.entity.UserPoints">
+        INSERT INTO user_points_history(id,user_id,total_points,sum_points,status,created_by,updated_by,master_id)
+        VALUES
+        (#{id,jdbcType=INTEGER},#{userId,jdbcType=VARCHAR},#{totalPoints,jdbcType=INTEGER},
+            #{sumPoints,jdbcType=INTEGER},#{status,jdbcType=INTEGER},#{createdBy,jdbcType=VARCHAR},#{updatedBy,jdbcType=VARCHAR},#{masterId,jdbcType=INTEGER})
+    </insert>
+
+    <insert id="saveUserConsumePoints"  parameterType="com.sinosafe.vo.PointsConsumptionVo">
+       insert into points_consumption_detail(id,user_id,points,order_amt,order_no,product_name,third_part_id,type,created_by,updated_by)
+      values
+        (#{id,jdbcType=INTEGER},#{loginId,jdbcType=VARCHAR},#{points,jdbcType=INTEGER},
+        #{orderAmt,jdbcType=DOUBLE},#{orderNo,jdbcType=VARCHAR},#{productNm,jdbcType=VARCHAR},#{thirdPartyId,jdbcType=VARCHAR},1,#{thirdPartyId,jdbcType=VARCHAR},#{thirdPartyId,jdbcType=VARCHAR})
+    </insert>
+    <select id="getUserAllProductionDetail" parameterType="java.lang.String" resultType="com.sinosafe.entity.PointProductionDetail">
+       SELECT
+       t.USER_ID userId,
+       t.POINT_TYPE pointType,
+       t.POINT_SOURCE pointSource,
+       sum(t.POINTS) points,
+       t.SUB_MECHANISM,
+       t.MECHANISM mechanism,
+       t.PRODUCT_CODE productCode,
+       t.PROPOSAL_NO proposalNo,
+       t.ORDER_NO orderNo,
+       t.FEE fee,
+       t.DEADLINE deadLine,
+       t.created_date createdDate
+       FROM points_prodution_detail t ,
+        (
+        SELECT
+        USER_ID ,
+        POINT_TYPE ,
+        POINT_SOURCE ,
+        POINTS ,
+        SUB_MECHANISM,
+        MECHANISM ,
+        PRODUCT_CODE ,
+        PROPOSAL_NO ,
+        ORDER_NO ,
+        FEE fee,
+        DEADLINE
+        FROM points_prodution_detail p1
+        WHERE p1.USER_ID=#{userId} AND p1.STATUS=1
+        minus
+        SELECT
+        USER_ID ,
+        POINT_TYPE ,
+        POINT_SOURCE ,
+        -POINTS ,
+        SUB_MECHANISM,
+        MECHANISM ,
+        PRODUCT_CODE ,
+        PROPOSAL_NO ,
+        ORDER_NO ,
+        FEE fee,
+        DEADLINE
+        FROM points_prodution_detail p2
+        WHERE p2.USER_ID=#{userId} AND p2.STATUS=4
+        ) t2
+        where t.user_id=t2.user_id and t.proposal_no=t2.proposal_no
+        having sum(t.POINTS) != 0
+        group by
+           t.USER_ID ,
+           t.POINT_TYPE ,
+           t.POINT_SOURCE ,
+           t.SUB_MECHANISM,
+           t.MECHANISM ,
+           t.PRODUCT_CODE ,
+           t.PROPOSAL_NO,
+           t.ORDER_NO ,
+           t.FEE ,
+           t.DEADLINE,
+           t.created_date
+       order by   t.deadline, t.created_date
+    </select>
+
+
+</mapper>

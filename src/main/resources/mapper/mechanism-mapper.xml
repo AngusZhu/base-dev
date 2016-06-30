@@ -1,0 +1,17 @@
+<?xml version="1.0"  encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sinosafe.dao.mapper.MechanismMapper">
+    <resultMap id="mechanismMap" type="com.sinosafe.entity.Mechanism">
+        <result property="id" jdbcType="INTEGER" javaType="int" column="id" />
+        <result property="mechanism" jdbcType="VARCHAR" javaType="String" column="MECHANISM" />
+        <result property="mechanismName" jdbcType="VARCHAR" javaType="String" column="MECHANISM_NAME" />
+        <result property="parentMechanism" jdbcType="VARCHAR" javaType="String" column="PARENT_MECHANISM" />
+        <result property="status" jdbcType="INTEGER" javaType="int" column="STATUS" />
+        <result property="createdBy" jdbcType="VARCHAR" javaType="String" column="CREATED_BY" />
+        <result property="updatedBy" jdbcType="VARCHAR" javaType="String" column="UPDATED_BY" />
+    </resultMap>
+
+    <select id="findMechanism" resultMap="mechanismMap">
+        select mechanism,mechanism_name from MECHANISM where status = 1
+    </select>
+</mapper>
